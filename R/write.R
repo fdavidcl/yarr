@@ -2,6 +2,26 @@
 # Functions to export a dataset onto an ARFF file
 #
 
+#' @title Write a data.frame onto an ARFF file
+#' @description Takes a data frame and records it in ARFF (Attribute-Relation File Format).
+#' @param x A data.frame
+#' @param relation Name of the dataset
+#' @param types A character vector indicating the type of each variable (optional)
+#' @param file Name of the file to read the data from
+#' @param sparse Logical: write in sparse format?
+#' @param append Logical: append to an existing file?
+#' @param ... Extra parameters for internal functions
+#' @return A `data.frame` with some attributes:
+#'   - attributes: a named vector indicating the type of each variable
+#'   - relation: the original "@relation" of the dataset
+#'   - name: the extracted name (if the file is in MEKA format)
+#' @examples
+#'
+#' library(yarr)
+#'\dontrun{
+#' write.arff(iris, "iris", file = "iris.arff")
+#'}
+#' @export
 write.arff <- function(x, relation = NULL, types = NULL, file = "", sparse = FALSE, append = FALSE, ...) {
   if (is.null(relation)) {
     relattr <- attr(x, "relation")

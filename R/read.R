@@ -6,7 +6,7 @@
 #' @title Read an ARFF file
 #' @description Reads a multilabel dataset from an ARFF file in Mulan or MEKA
 #' and retrieves instances distinguishing attributes corresponding to labels
-#' @param filen Name of the file to read the data from
+#' @param file Name of the file to read the data from
 #' @param stringsAsFactors logical: should categorical attributes be converted to factors?
 #' @return A `data.frame` with some attributes:
 #'   - attributes: a named vector indicating the type of each variable
