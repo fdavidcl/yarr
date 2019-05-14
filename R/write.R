@@ -19,47 +19,60 @@ write.arff <- function(x, relation = NULL, types = NULL, file = "", sparse = FAL
       typattr
   }
 
-  arffConnection <- base::file(name, open = if (append) "a" else "w")
+  arffConnection <- base::file(file, open = if (append) "a" else "w")
   on.exit(close(arffConnection))
   export.arff(x, relation, types, sparse, arffConnection, ...)
 }
 
 compute_types <- function(x) {
+  # TODO: Convert R classes to ARFF types
+  cl <- sapply(x, class)
 
+  types <- vector("character", length(cl))
+  for (i in 1:length(types)) {
+    types[i] <- if (cl[i] %in% c("factor", "character")) {
+      paste0("{", paste(unique(x[, i]), collapse = ","), "}")
+    } else if (cl[i] == "numeric") {
+      "numeric"
+    }
+  }
+
+  names(types) <- colnames(x)
+  types
 }
 
 export.arff <- function(x, relation, types, sparse, con, ...) {
   writeLines(export.header(relation), con)
   writeLines(export.arff.attributes(types), con)
-  export.arff.data(mld, sparse, con = con, ...)
+  export.arff.data(x, sparse, con = con, ...)
 }
 
 export.header <- function(relation) {
   paste0("@relation ", relation)
 }
 
-export.arff.attributes <- function(mld) {
-  attrNames <- ifelse(grepl("(\\s|\"|\')", names(mld$attributes)),
+export.arff.attributes <- function(types) {
+  attr_names <- names(types)
+  attr_names <- ifelse(grepl("(\\s|\"|\')", attr_names),
                       paste0("'", gsub(
-                        "'", "\\'", names(mld$attributes), fixed = T
+                        "'", "\\'", attr_names, fixed = T
                       ), "'"),
-                      names(mld$attributes))
+                      attr_names)
   paste("@attribute",
-        attrNames,
-        mld$attributes)
+        attr_names,
+        types)
 }
 
-export.arff.data <- function(mld, sparse, con, header = "@data\n", ...) {
-  data <- mld$dataset[, 1:mld$measures$num.attributes]
-  data[is.na(data)] <- '?'
+export.arff.data <- function(x, sparse, con, header = "@data\n", ...) {
+  x[is.na(x)] <- '?'
 
   cat(header, file = con)
-  export.arff.chunks(data, con = con, sparse = sparse, ...)
+  export.arff.chunks(x, con = con, sparse = sparse, ...)
 }
 
 
 export.dense.arff.data <- function(data) {
-  do.call("paste", c(unname(data), list(sep = ',')))
+  do.call(paste, c(unname(data), list(sep = ',')))
 }
 
 export.sparse.arff.data <- function(data) {

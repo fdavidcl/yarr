@@ -26,13 +26,18 @@ read.arff <- function(file, stringsAsFactors = default.stringsAsFactors()) {
   contents <-
     read_arff_internal(file, stringsAsFactors = stringsAsFactors)
 
-  relation <- attr(contents, "relation")
-  attr(contents, "name") <- read_header(relation)
+  attr(contents, "relation") <- read_header(attr(contents, "relation"))
 
   # Adjust type of numeric attributes
   attrs <- attr(contents, "attributes")
   contents[, which(attrs == "numeric")] <-
-    lapply(contents[, which(attrs == "numeric")], as.numeric)
+    lapply(contents[, which(attrs == "numeric")], function(column) {
+      if (is.factor(column)) {
+        as.numeric(levels(column)[column])
+      } else {
+        as.numeric(column)
+      }
+    })
 
   structure(contents,
             class = c("arff_data", class(contents)))
