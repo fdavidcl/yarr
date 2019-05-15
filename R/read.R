@@ -1,24 +1,41 @@
+# yarr, Yet Another ARFF Reader
+# Copyright (C) 2019 David Charte & Francisco Charte
 #
-# Contains necessary functions to read ARFF files in
-# different formats (sparse and dense)
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Functions to read ARFF files in different formats (sparse and dense)
 #
 
-#' @title Read an ARFF file
-#' @description Reads a multilabel dataset from an ARFF file in Mulan or MEKA
-#' and retrieves instances distinguishing attributes corresponding to labels
-#' @param file Name of the file to read the data from
-#' @param stringsAsFactors logical: should categorical attributes be converted to factors?
-#' @return A `data.frame` with some attributes:
-#'   - attributes: a named vector indicating the type of each variable
-#'   - relation: the original "@relation" of the dataset
-#'   - name: the extracted name (if the file is in MEKA format)
-#' @examples
+#'@title Read an ARFF file
+#'@description Reads a dataset from an ARFF file, parsing each section and
+#'  converting the data section into a `data.frame`.
+#'@param file Name of the file to read the data from
+#'@param stringsAsFactors Logical: should categorical attributes be converted to
+#'  factors?
+#'@return A `data.frame` with some attributes:
+#'
+#'  - attributes: a named vector indicating the type of each variable
+#'  - relation: the original `@relation` of the dataset
+#'
+#'@examples
 #'
 #' library(yarr)
-#'\dontrun{
+#'\donttest{
 #' yeast <- read.arff("yeast.arff")
 #'}
-#' @export
+#'@export
 read.arff <- function(file, stringsAsFactors = default.stringsAsFactors()) {
   # Get file contents
   relation <- NULL
@@ -82,10 +99,12 @@ read_arff_internal <- function(arff_file, ...) {
 
   # Build data.frame with @data section
   rawdata <- file_data[data_start:length(file_data)]
-  dataset <- if (detect_sparsity(rawdata))
-    parse_sparse_data(rawdata, num_attrs, ...)
-  else
+  dataset <- if (detect_sparsity(rawdata)) {
+    fix_sparse_factors(parse_sparse_data(rawdata, num_attrs, ...),
+                       attributes)
+  } else {
     parse_nonsparse_data(rawdata, num_attrs, ...)
+  }
 
   rm(rawdata)
   names(dataset) <- names(attributes)
@@ -187,9 +206,9 @@ parse_nonsparse_data <- function(arff_data, num_attrs, stringsAsFactors = defaul
 # @return data.frame containing data values
 parse_sparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.stringsAsFactors()) {
   # Extract data items
-  arff_data <- strsplit(gsub("[\\{\\}]", "", arff_data), ",")
+  arff_data <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", arff_data), "\\s*,\\s*")
   arff_data <- lapply(arff_data, function(item) {
-    unlist(strsplit(gsub("^\\s+|\\s+$", "", item), " "))
+    unlist(strsplit(item, "\\s+"))
   })
 
   # Build complete matrix with data
@@ -201,4 +220,19 @@ parse_sparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.s
 
   # Create and return data.frame
   data.frame(t(dataset), stringsAsFactors = stringsAsFactors)
+}
+
+fix_sparse_factors <- function(dataset, attributes) {
+  factors <- which(grepl("^\\s*\\{", attributes))
+  for (i in factors) {
+    values <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", attributes[i]), "\\s*,\\s*")[[1]]
+
+    if (is.factor(dataset[[i]])) {
+      levels(dataset[[i]])[which(levels(dataset[[i]]) == "0")] <- values[1]
+    } else {
+      dataset[dataset[[i]] == 0, i] <- values[1]
+    }
+  }
+
+  dataset
 }
