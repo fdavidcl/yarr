@@ -100,8 +100,7 @@ read_arff_internal <- function(arff_file, ...) {
   # Build data.frame with @data section
   rawdata <- file_data[data_start:length(file_data)]
   dataset <- if (detect_sparsity(rawdata)) {
-    fix_sparse_factors(parse_sparse_data(rawdata, num_attrs, ...),
-                       attributes)
+    parse_sparse_data(rawdata, num_attrs, defaults = sparse_defaults(attributes), ...)
   } else {
     parse_nonsparse_data(rawdata, num_attrs, ...)
   }
@@ -204,7 +203,7 @@ parse_nonsparse_data <- function(arff_data, num_attrs, stringsAsFactors = defaul
 #
 # @param arff_data Content of the data section
 # @return data.frame containing data values
-parse_sparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.stringsAsFactors()) {
+parse_sparse_data <- function(arff_data, num_attrs, defaults, stringsAsFactors = default.stringsAsFactors()) {
   # Extract data items
   arff_data <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", arff_data), "\\s*,\\s*")
   arff_data <- lapply(arff_data, function(item) {
@@ -213,7 +212,7 @@ parse_sparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.s
 
   # Build complete matrix with data
   dataset <- sapply(arff_data, function(row) {
-    complete <- rep(0, num_attrs)
+    complete <- defaults
     complete[as.integer(row[c(T, F)]) + 1] <- row[c(F, T)]
     complete
   })
@@ -222,17 +221,23 @@ parse_sparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.s
   data.frame(t(dataset), stringsAsFactors = stringsAsFactors)
 }
 
-fix_sparse_factors <- function(dataset, attributes) {
+# The default value for a sparse variable is:
+#  - 0, if the attribute is numeric
+#  - The first value of the factor, if the attribute is categorical
+#  - ""? if the type is string (the dataset was probably badly exported)
+sparse_defaults <- function(attributes) {
+  defaults <- vector(mode = "character", length = length(attributes))
+
+  # Detect factors, extract values
   factors <- which(grepl("^\\s*\\{", attributes))
-  for (i in factors) {
-    values <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", attributes[i]), "\\s*,\\s*")[[1]]
+  values <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", attributes[factors]), "\\s*,\\s*")
+  defaults[factors] <- sapply(values, function(v) v[1])
 
-    if (is.factor(dataset[[i]])) {
-      levels(dataset[[i]])[which(levels(dataset[[i]]) == "0")] <- values[1]
-    } else {
-      dataset[dataset[[i]] == 0, i] <- values[1]
-    }
-  }
+  strings <- which(attributes == "string")
+  defaults[strings] <- ""
 
-  dataset
+  rest <- setdiff(1:length(attributes), union(factors, strings))
+  defaults[numerics] <- "0" # will be converted to numeric later
+
+  defaults
 }
