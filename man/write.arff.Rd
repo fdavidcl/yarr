@@ -10,11 +10,15 @@ write.arff(x, relation = NULL, types = NULL, file = "",
 \arguments{
 \item{x}{A data.frame}
 
-\item{relation}{Name of the dataset}
+\item{relation}{Name of the dataset (optional, it may be inferred from the
+\code{relation} attribute or the name of the variable passed as argument)}
 
-\item{types}{A character vector indicating the type of each variable (optional)}
+\item{types}{A character vector indicating the type of each variable
+(optional, may be inferred from the \code{attributes} attribute or computed from
+the class of each variable)}
 
-\item{file}{Name of the file to read the data from}
+\item{file}{Name of the file where the data is to be written. Use \code{""} to
+write to standard output}
 
 \item{sparse}{Logical: write in sparse format?}
 
@@ -23,18 +27,16 @@ write.arff(x, relation = NULL, types = NULL, file = "",
 \item{...}{Extra parameters for internal functions}
 }
 \value{
-A `data.frame` with some attributes:
-  - attributes: a named vector indicating the type of each variable
-  - relation: the original "@relation" of the dataset
-  - name: the extracted name (if the file is in MEKA format)
+Invisibly, the name of the file.
 }
 \description{
-Takes a data frame and records it in ARFF (Attribute-Relation File Format).
+Takes a data frame and records it in ARFF (Attribute-Relation
+File Format).
 }
 \examples{
 
 library(yarr)
-\dontrun{
-write.arff(iris, "iris", file = "iris.arff")
+\donttest{
+write.arff(iris, "iris", file = tempfile())
 }
 }

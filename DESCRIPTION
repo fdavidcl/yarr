@@ -1,11 +1,20 @@
 Package: yarr
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Yet Another ARFF Reader
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Authors@R: c(person("David", "Charte", email = "fdavidcl@ugr.es", role = c("aut", "cre"),
+    comment = c(ORCID = "0000-0002-4830-9512")), person("Francisco", "Charte", 
+    email = "francisco@fcharte.com", role = "aut", comment = c(ORCID = "0000-0002-3083-8942")))
+Description: Read and write ARFF files in dense and sparse formats, a pure R implementation
+    with no external dependencies.
+License: GPL (>=3)
 Encoding: UTF-8
 LazyData: true
+URL: https://github.com/fdavidcl/yarr
+BugReports: https://github.com/fdavidcl/yarr/issues
+Depends:
+    R (>= 3.6)
+Suggests: 
+    testthat (>= 2.1.0)
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 6.1.1

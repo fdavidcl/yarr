@@ -1,27 +1,45 @@
+# yarr, Yet Another ARFF Reader
+# Copyright (C) 2019 David Charte & Francisco Charte
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 #
 # Functions to export a dataset onto an ARFF file
 #
 
-#' @title Write a data.frame onto an ARFF file
-#' @description Takes a data frame and records it in ARFF (Attribute-Relation File Format).
-#' @param x A data.frame
-#' @param relation Name of the dataset
-#' @param types A character vector indicating the type of each variable (optional)
-#' @param file Name of the file to read the data from
-#' @param sparse Logical: write in sparse format?
-#' @param append Logical: append to an existing file?
-#' @param ... Extra parameters for internal functions
-#' @return A `data.frame` with some attributes:
-#'   - attributes: a named vector indicating the type of each variable
-#'   - relation: the original "@relation" of the dataset
-#'   - name: the extracted name (if the file is in MEKA format)
+#'@title Write a data.frame onto an ARFF file
+#'@description Takes a data frame and records it in ARFF (Attribute-Relation
+#'  File Format).
+#'@param x A data.frame
+#'@param relation Name of the dataset (optional, it may be inferred from the
+#'  `relation` attribute or the name of the variable passed as argument)
+#'@param types A character vector indicating the type of each variable
+#'  (optional, may be inferred from the `attributes` attribute or computed from
+#'  the class of each variable)
+#'@param file Name of the file where the data is to be written. Use `""` to
+#'  write to standard output
+#'@param sparse Logical: write in sparse format?
+#'@param append Logical: append to an existing file?
+#'@param ... Extra parameters for internal functions
+#'@return Invisibly, the name of the file.
 #' @examples
 #'
 #' library(yarr)
-#'\dontrun{
-#' write.arff(iris, "iris", file = "iris.arff")
+#'\donttest{
+#' write.arff(iris, "iris", file = tempfile())
 #'}
-#' @export
+#'@export
 write.arff <- function(x, relation = NULL, types = NULL, file = "", sparse = FALSE, append = FALSE, ...) {
   if (is.null(relation)) {
     relattr <- attr(x, "relation")
@@ -32,28 +50,28 @@ write.arff <- function(x, relation = NULL, types = NULL, file = "", sparse = FAL
   }
 
   if (is.null(types)) {
-    typattr <- attr(x, "attributes")
-    types <- if (is.null(typattr))
-      compute_types(x)
-    else
-      typattr
+    types <- compute_types(x)
   }
 
-  arffConnection <- base::file(file, open = if (append) "a" else "w")
-  on.exit(close(arffConnection))
+  arffConnection <- if (file == "") stdout() else base::file(file, open = if (append) "a" else "w")
+  on.exit(if (file != "") close(arffConnection))
   export.arff(x, relation, types, sparse, arffConnection, ...)
+  invisible(file)
 }
 
-compute_types <- function(x) {
-  # TODO: Convert R classes to ARFF types
-  cl <- sapply(x, class)
+compute_types <- function(x) UseMethod("compute_types")
 
-  types <- vector("character", length(cl))
+compute_types.arff_data <- function(x) attr.types(x)
+
+compute_types.default <- function(x) {
+  types <- vector("character", ncol(x))
   for (i in 1:length(types)) {
-    types[i] <- if (cl[i] %in% c("factor", "character")) {
-      paste0("{", paste(unique(x[, i]), collapse = ","), "}")
-    } else if (cl[i] == "numeric") {
+    types[i] <- if (is.numeric(x[[i]])) {
       "numeric"
+    } else if (length(unique(x[[i]])) < length(x[[i]])) {
+        paste0("{", paste(unique(x[[i]]), collapse = ","), "}")
+    } else {
+      "string"
     }
   }
 
@@ -146,10 +164,3 @@ export.arff.chunks <-
       ch <- ch + 1
     }
   }
-
-export.csv <- function(mld, sparse, con, ...) export.arff.data(mld, sparse = sparse, header = "", con = con, ...)
-
-export.csv.labels <- function(mld) {
-  paste(rownames(mld$labels), mld$labels$index, sep = ", ")
-}
-

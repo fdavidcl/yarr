@@ -9,22 +9,24 @@ read.arff(file, stringsAsFactors = default.stringsAsFactors())
 \arguments{
 \item{file}{Name of the file to read the data from}
 
-\item{stringsAsFactors}{logical: should categorical attributes be converted to factors?}
+\item{stringsAsFactors}{Logical: should categorical attributes be converted to
+factors?}
 }
 \value{
-A `data.frame` with some attributes:
-  - attributes: a named vector indicating the type of each variable
-  - relation: the original "@relation" of the dataset
-  - name: the extracted name (if the file is in MEKA format)
+A \code{data.frame} with some attributes:
+\itemize{
+\item attributes: a named vector indicating the type of each variable
+\item relation: the original \code{@relation} of the dataset
+}
 }
 \description{
-Reads a multilabel dataset from an ARFF file in Mulan or MEKA
-and retrieves instances distinguishing attributes corresponding to labels
+Reads a dataset from an ARFF file, parsing each section and
+converting the data section into a \code{data.frame}.
 }
 \examples{
 
 library(yarr)
-\dontrun{
+\donttest{
 yeast <- read.arff("yeast.arff")
 }
 }
