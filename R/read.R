@@ -46,15 +46,14 @@ read.arff <- function(file, stringsAsFactors = default.stringsAsFactors()) {
   attr(contents, "relation") <- read_header(attr(contents, "relation"))
 
   # Adjust type of numeric attributes
-  attrs <- attr(contents, "attributes")
-  contents[, which(attrs == "numeric")] <-
-    lapply(contents[, which(attrs == "numeric")], function(column) {
-      if (is.factor(column)) {
-        as.numeric(levels(column)[column])
-      } else {
-        as.numeric(column)
-      }
-    })
+  attrs <- which(attr(contents, "attributes") == "numeric")
+  for (i in attrs) {
+    contents[[i]] <- if (is.factor(contents[[i]])) {
+      as.numeric(levels(contents[[i]])[contents[[i]]])
+    } else {
+      as.numeric(contents[[i]])
+    }
+  }
 
   structure(contents,
             class = c("arff_data", class(contents)))
@@ -100,13 +99,13 @@ read_arff_internal <- function(arff_file, ...) {
   # Build data.frame with @data section
   rawdata <- file_data[data_start:length(file_data)]
   dataset <- if (detect_sparsity(rawdata)) {
-    parse_sparse_data(rawdata, num_attrs, defaults = sparse_defaults(attributes), ...)
+    parse_sparse_data(rawdata, defaults = sparse_defaults(attributes), ...)
   } else {
     parse_nonsparse_data(rawdata, num_attrs, ...)
   }
 
   rm(rawdata)
-  names(dataset) <- names(attributes)
+  colnames(dataset) <- names(attributes)
 
   return(structure(dataset,
                    relation = relation,
@@ -143,15 +142,15 @@ parse_attributes <- function(arff_attrs) {
                     ncol = 3, byrow = T)
   rm(att_list)
   # Filter any data that is not an attribute
-  att_mat <- att_mat[grepl("\\s*@attribute", att_mat[, 1], ignore.case = TRUE), 2:3]
+  att_mat <- att_mat[grepl("\\s*@attribute", att_mat[, 1], ignore.case = TRUE), 2:3, drop = FALSE]
   att_mat <- gsub("^'(.*?)'$", "\\1", att_mat, perl = T)
   att_mat <- gsub('^"(.*?)"$', "\\1", att_mat, perl = T)
   att_mat[, 1] <- gsub("\\'", "'", att_mat[, 1], fixed = T)
   att_mat[, 1] <- gsub('\\"', '"', att_mat[, 1], fixed = T)
 
   # Create the named vector
-  att_v <- att_mat[, 2]
-  names(att_v) <- att_mat[, 1]
+  att_v <- att_mat[, 2, drop = FALSE]
+  names(att_v) <- att_mat[, 1, drop = FALSE]
 
   rm(att_mat)
   return(att_v)
@@ -203,22 +202,23 @@ parse_nonsparse_data <- function(arff_data, num_attrs, stringsAsFactors = defaul
 #
 # @param arff_data Content of the data section
 # @return data.frame containing data values
-parse_sparse_data <- function(arff_data, num_attrs, defaults, stringsAsFactors = default.stringsAsFactors()) {
+parse_sparse_data <- function(arff_data, defaults, stringsAsFactors = default.stringsAsFactors()) {
   # Extract data items
+  empty <- grep("^\\s*$", arff_data)
+  arff_data <- if (length(empty) > 0) arff_data[-empty] else arff_data
   arff_data <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", arff_data), "\\s*,\\s*")
-  arff_data <- lapply(arff_data, function(item) {
-    unlist(strsplit(item, "\\s+"))
-  })
 
-  # Build complete matrix with data
-  dataset <- sapply(arff_data, function(row) {
+  dataset <- lapply(arff_data, function(item) {
+    row <- unlist(strsplit(item, "\\s+"))
+
+    # Build complete row with data
     complete <- defaults
     complete[as.integer(row[c(T, F)]) + 1] <- row[c(F, T)]
     complete
   })
 
   # Create and return data.frame
-  data.frame(t(dataset), stringsAsFactors = stringsAsFactors)
+  t(data.frame(dataset, stringsAsFactors = stringsAsFactors))
 }
 
 # The default value for a sparse variable is:
@@ -237,7 +237,7 @@ sparse_defaults <- function(attributes) {
   defaults[strings] <- ""
 
   rest <- setdiff(1:length(attributes), union(factors, strings))
-  defaults[numerics] <- "0" # will be converted to numeric later
+  defaults[rest] <- "0" # will be converted to numeric later
 
   defaults
 }
