@@ -22,8 +22,8 @@
 #'@description Reads a dataset from an ARFF file, parsing each section and
 #'  converting the data section into a `data.frame`.
 #'@param file Name of the file to read the data from
-#'@param stringsAsFactors Logical: should categorical attributes be converted to
-#'  factors?
+#'@param stringsAsFactors Logical: should string attributes be converted to
+#'  factors? (nominal attributes are always converted to factors)
 #'@return A `data.frame` with some attributes:
 #'
 #'  - attributes: a named vector indicating the type of each variable
@@ -36,27 +36,30 @@
 #' yeast <- read.arff("yeast.arff")
 #'}
 #'@export
-read.arff <- function(file, stringsAsFactors = default.stringsAsFactors()) {
-  # Get file contents
-  relation <- NULL
-  attrs <- NULL
-  contents <-
-    read_arff_internal(file, stringsAsFactors = stringsAsFactors)
-
-  attr(contents, "relation") <- read_header(attr(contents, "relation"))
-
-  # Adjust type of numeric attributes
-  attrs <- which(attr(contents, "attributes") == "numeric")
-  for (i in attrs) {
-    contents[[i]] <- if (is.factor(contents[[i]])) {
-      as.numeric(levels(contents[[i]])[contents[[i]]])
-    } else {
-      as.numeric(contents[[i]])
-    }
-  }
+# character -> logical -> data.frame
+read.arff <- function(file, stringsAsFactors = FALSE) {
+  contents <- fix_types(read_arff_internal(file), stringsAsFactors)
 
   structure(contents,
             class = c("arff_data", class(contents)))
+}
+
+# data.frame -> logical -> data.frame
+fix_types <- function(contents, stringsAsFactors) {
+  types <- attr(contents, "attributes")
+  contents[contents == "?"] <- NA
+
+  for (i in 1:length(types)) {
+    if (types[i] %in% c("numeric", "integer", "real")) {
+      contents[[i]] <- as.numeric(contents[[i]])
+    } else if (grepl("^\\s*\\{", types[i])) {
+      contents[[i]] <- factor(contents[[i]], levels = read_factor_levels(types[i])[[1]])
+    } else if (stringsAsFactors) {
+      contents[[i]] <- factor(contents[[i]])
+    } # else, contents[[i]] is already a character vector
+  }
+
+  contents
 }
 
 # Extracts all useful data from an ARFF file in an
@@ -64,12 +67,12 @@ read.arff <- function(file, stringsAsFactors = default.stringsAsFactors()) {
 #
 # @param arff_file Path to the file
 # @return data.frame with "variables" and "relation" attributes
+# character -> ... -> data.frame
 read_arff_internal <- function(arff_file, ...) {
   file_con <- file(arff_file, "rb")
 
   if (!isOpen(file_con)) {
     open(file_con, "rb")
-    on.exit(close(file_con))
   }
 
   # Read whole file
@@ -85,19 +88,22 @@ read_arff_internal <- function(arff_file, ...) {
   if (is.na(relation_at)) stop("Missing @relation or not unique.")
   if (is.na(data_start)) stop("Missing @data mark or not unique.")
 
-  relation <- file_data[relation_at]
+  relation <- read_header(file_data[relation_at])
 
   # Get attribute vector
   attributes <- parse_attributes(file_data[(relation_at + 1):(data_start - 1)])
   num_attrs <- length(attributes)
 
-  # Ignore blank lines before data
-  data_start <- data_start + 1
-  while (grepl("^\\s*$", file_data[data_start]))
-    data_start <- data_start + 1
+  if (any(grepl("date", attributes))) warning("Date attributes will be read as strings")
+  if (any(grepl("relational", attributes))) stop("Relational attributes not supported at the moment")
 
-  # Build data.frame with @data section
+  # Ignore blank lines and comments before data
+  data_start <- data_start + 1
   rawdata <- file_data[data_start:length(file_data)]
+  empty <- grep("^\\s*(%(.*?))$", rawdata)
+  rawdata <- if (length(empty) > 0) rawdata[-empty] else rawdata
+
+  # Build character matrix with @data section
   dataset <- if (detect_sparsity(rawdata)) {
     parse_sparse_data(rawdata, defaults = sparse_defaults(attributes), ...)
   } else {
@@ -105,7 +111,10 @@ read_arff_internal <- function(arff_file, ...) {
   }
 
   rm(rawdata)
+
+  dataset <- as.data.frame(dataset, stringsAsFactors = FALSE)
   colnames(dataset) <- names(attributes)
+  rownames(dataset) <- NULL
 
   return(structure(dataset,
                    relation = relation,
@@ -117,6 +126,7 @@ read_arff_internal <- function(arff_file, ...) {
 # @param arff_attrs Lines containing the attributes
 # @return A vector containing, for each
 #  attribute, its name and its type
+# character[] -> named character[]
 parse_attributes <- function(arff_attrs) {
   # Extract attribute definitions
 
@@ -138,43 +148,70 @@ parse_attributes <- function(arff_attrs) {
   att_list <- strsplit(arff_attrs, rgx, perl = TRUE)
 
   # Structure by rows
-  att_mat <- matrix(unlist(att_list[sapply(att_list, function(row){length(row) == 3})]),
-                    ncol = 3, byrow = T)
+  att_mat <-
+    matrix(unlist(att_list[sapply(att_list, function(row) {
+      length(row) == 3
+    })]),
+    ncol = 3, byrow = T)
   rm(att_list)
   # Filter any data that is not an attribute
-  att_mat <- att_mat[grepl("\\s*@attribute", att_mat[, 1], ignore.case = TRUE), 2:3, drop = FALSE]
+  att_mat <- att_mat[grepl("^\\s*@attribute", att_mat[, 1], ignore.case = TRUE), 2:3, drop = FALSE]
   att_mat <- gsub("^'(.*?)'$", "\\1", att_mat, perl = T)
   att_mat <- gsub('^"(.*?)"$', "\\1", att_mat, perl = T)
   att_mat[, 1] <- gsub("\\'", "'", att_mat[, 1], fixed = T)
   att_mat[, 1] <- gsub('\\"', '"', att_mat[, 1], fixed = T)
 
   # Create the named vector
-  att_v <- att_mat[, 2, drop = FALSE]
-  names(att_v) <- att_mat[, 1, drop = FALSE]
+  att_v <- att_mat[, 2, drop = TRUE]
+  names(att_v) <- att_mat[, 1, drop = TRUE]
 
   rm(att_mat)
   return(att_v)
 }
 
-# Reads the name and Meka parameters in the header of an
+# Reads the name and potential Meka parameters in the header of an
 # ARFF file
 #
 # @param arff_relation "relation" line of the ARFF file
 # @return Number of labels in the dataset
+# character -> character
 read_header <- function(arff_relation) {
   rgx <- regexpr("[\\w\\-\\._]+\\s*:\\s*-[Cc]\\s*-?\\d+", arff_relation, perl = TRUE)
   hdr <- strsplit(regmatches(arff_relation, rgx), "\\s*:\\s*-[Cc]\\s*")
 
   if (length(hdr) > 0) {
     # Meka header
-    return(structure(
+    structure(
       hdr[[1]][1],
       c = as.numeric(hdr[[1]][2])
-    ))
+    )
   } else {
-    # Mulan header
-    nm <- regmatches(arff_relation, regexpr("(?<=\\s)'?[\\w\\-\\._]+'?", arff_relation, perl = TRUE))
-    return(nm)
+    # Normal header, unquoted or quoted (these should not match at the same
+    # time)
+    c(regmatches(
+      arff_relation,
+      regexpr(
+        "(?<=\\s)([^\\s'\"]+?)(?=\\s*$)",
+        arff_relation,
+        perl = TRUE
+      )
+    ),
+    regmatches(
+      arff_relation,
+      regexpr(
+        "(?<=\\s')(([^']|\\\\')+?)(?='\\s*$)",
+        arff_relation,
+        perl = TRUE
+      )
+    ),
+    regmatches(
+      arff_relation,
+      regexpr(
+        "(?<=\\s\")(([^\"]|\\\\\")+?)(?=\"\\s*$)",
+        arff_relation,
+        perl = TRUE
+      )
+    ))[1] # ensure scalar
   }
 }
 
@@ -182,6 +219,7 @@ read_header <- function(arff_relation) {
 #
 # @param arff_data Content of the data section
 # @return Boolean, TRUE when the file is sparse
+# character[] -> logical
 detect_sparsity <- function(arff_data) {
   grepl("^\\s*\\{", arff_data[1])
 }
@@ -189,55 +227,60 @@ detect_sparsity <- function(arff_data) {
 # Builds a data.frame out of non-sparse ARFF data
 #
 # @param arff_data Content of the data section
-# @return data.frame containing data values
-parse_nonsparse_data <- function(arff_data, num_attrs, stringsAsFactors = default.stringsAsFactors()) {
-  data.frame(matrix(
+# @return character matrix containing data values
+# character -> integer -> character[,]
+parse_nonsparse_data <- function(arff_data, num_attrs) {
+  matrix(
     unlist(strsplit(arff_data, ",", fixed = T)),
     ncol = num_attrs,
     byrow = T
-  ), stringsAsFactors = stringsAsFactors)
+  )
 }
 
 # Builds a data.frame out of sparse ARFF data
 #
 # @param arff_data Content of the data section
-# @return data.frame containing data values
-parse_sparse_data <- function(arff_data, defaults, stringsAsFactors = default.stringsAsFactors()) {
+# @return character matrix containing data values
+# character -> character[] -> character[,]
+parse_sparse_data <- function(arff_data, defaults) {
   # Extract data items
-  empty <- grep("^\\s*$", arff_data)
-  arff_data <- if (length(empty) > 0) arff_data[-empty] else arff_data
   arff_data <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", arff_data), "\\s*,\\s*")
 
-  dataset <- lapply(arff_data, function(item) {
+  dataset <- vapply(arff_data, function(item) {
     row <- unlist(strsplit(item, "\\s+"))
 
     # Build complete row with data
     complete <- defaults
     complete[as.integer(row[c(T, F)]) + 1] <- row[c(F, T)]
     complete
-  })
+  }, defaults)
 
-  # Create and return data.frame
-  t(data.frame(dataset, stringsAsFactors = stringsAsFactors))
+  matrix(dataset, ncol = length(defaults), byrow = T)
 }
 
 # The default value for a sparse variable is:
 #  - 0, if the attribute is numeric
 #  - The first value of the factor, if the attribute is categorical
 #  - ""? if the type is string (the dataset was probably badly exported)
+# character[] -> character[]
 sparse_defaults <- function(attributes) {
   defaults <- vector(mode = "character", length = length(attributes))
 
   # Detect factors, extract values
   factors <- which(grepl("^\\s*\\{", attributes))
-  values <- strsplit(gsub("\\s*[\\{\\}]\\s*", "", attributes[factors]), "\\s*,\\s*")
+  values <- read_factor_levels(attributes[factors])
   defaults[factors] <- sapply(values, function(v) v[1])
 
-  strings <- which(attributes == "string")
+  numeric <- which(attributes %in% c("numeric", "integer", "real"))
+  defaults[numeric] <- "0" # will be converted to numeric later
+
+  strings <- setdiff(1:length(attributes), union(factors, numeric))
   defaults[strings] <- ""
 
-  rest <- setdiff(1:length(attributes), union(factors, strings))
-  defaults[rest] <- "0" # will be converted to numeric later
-
   defaults
+}
+
+# character -> character[]
+read_factor_levels <- function(definition) {
+  strsplit(gsub("\\s*[\\{\\}]\\s*", "", definition), "\\s*,\\s*")
 }
