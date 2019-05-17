@@ -114,10 +114,12 @@ export.dense.arff.data <- function(data) {
 }
 
 export.sparse.arff.data <- function(data) {
-  # skip type check since some datasets have factors read as character
-  # TODO improve read.arff to read binary factors as 0-1
-  #ischar <- sapply(data, is.character)
-  nonzero <- data != 0
+  nonzero <- sapply(data, function(col) {
+    if (is.numeric(col)) col != 0
+    # else if (is.factor(col)) col != levels(col)[1]
+    else rep(TRUE, length(col))
+  })
+  ch_data <- sapply(data, as.character)
 
   sapply(1:nrow(data), function(i) {
     select <- nonzero[i, ]
@@ -125,7 +127,7 @@ export.sparse.arff.data <- function(data) {
       "{",
       paste(
         which(select) - 1,
-        data[i, select],
+        ch_data[i, select],
         sep = " ",
         collapse = ","
       ),
