@@ -58,3 +58,4 @@ write.arff(dexter, "dexter-new.arff")
 
 - Date attributes are read as mere strings
 - Relational attributes are not supported
+- Instance weights
