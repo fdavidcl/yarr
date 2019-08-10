@@ -21,7 +21,7 @@
 #'   of each variable, `relation` shows the name/relation specified in the
 #'   `@relation` section of the file.
 #'
-#' @param x A dataset read using [`read.arff`](read.arff.html)
+#' @param x A dataset read using `read.arff`
 #' @rdname utils
 #' @export
 attr.names <- function(x) {

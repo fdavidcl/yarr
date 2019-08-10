@@ -29,6 +29,9 @@
 #'  - attributes: a named vector indicating the type of each variable
 #'  - relation: the original `@relation` of the dataset
 #'
+#'Use `attr.names()`, `attr.types()` and `relation()` to consult attribute
+#'names, types and the name of the dataset, respectively.
+#'
 #'@examples
 #'
 #' library(yarr)
@@ -100,7 +103,7 @@ read_arff_internal <- function(arff_file, ...) {
   # Ignore blank lines and comments before data
   data_start <- data_start + 1
   rawdata <- file_data[data_start:length(file_data)]
-  empty <- grep("^\\s*(%(.*?))$", rawdata)
+  empty <- grep("^\\s*(%(.*?))?$", rawdata)
   rawdata <- if (length(empty) > 0) rawdata[-empty] else rawdata
 
   # Build character matrix with @data section

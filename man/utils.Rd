@@ -13,7 +13,7 @@ attr.types(x)
 relation(x)
 }
 \arguments{
-\item{x}{A dataset read using \href{read.arff.html}{read.arff}}
+\item{x}{A dataset read using \code{read.arff}}
 }
 \description{
 Some tools to access the metadata in ARFF files. \code{attr.names}

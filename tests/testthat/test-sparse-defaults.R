@@ -4,6 +4,7 @@ test_that("factors can have a zero", {
 @relation test
 @attribute Test {-1,0,1}
 @data
+
 {}
 {0 0}
 {0 1}", filename)

@@ -18,6 +18,9 @@ A \code{data.frame} with some attributes:
 \item attributes: a named vector indicating the type of each variable
 \item relation: the original \code{@relation} of the dataset
 }
+
+Use \code{attr.names()}, \code{attr.types()} and \code{relation()} to consult attribute
+names, types and the name of the dataset, respectively.
 }
 \description{
 Reads a dataset from an ARFF file, parsing each section and
