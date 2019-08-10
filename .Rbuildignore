@@ -1,2 +1,7 @@
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^LICENSE$
+^dexter\.arff$
+^gisette\.arff$
+^cran-comments\.md$
+^CRAN-RELEASE$
