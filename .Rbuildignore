@@ -5,3 +5,4 @@
 ^gisette\.arff$
 ^cran-comments\.md$
 ^CRAN-RELEASE$
+^docs$
