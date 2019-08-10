@@ -5,7 +5,6 @@ yarr
 
 [![R language](https://img.shields.io/badge/language-R-lightgrey.svg)](https://www.r-project.org/)
 [![Downloads](https://cranlogs.r-pkg.org/badges/yarr)](https://cranlogs.r-pkg.org/downloads/total/last-month/yarr)
-[![Travis](https://img.shields.io/travis/fdavidcl/yarr/master.svg)](https://travis-ci.org/fdavidcl/yarr)
 [![GPL v3 license](https://img.shields.io/github/license/fdavidcl/yarr.svg)](https://www.gnu.org/licenses/gpl.html)
 
 ---
@@ -24,7 +23,9 @@ The implementations in R are derivatives of those in [`mldr`](https://github.com
 ### Usage
 
 ```r
-remotes::install_github("fdavidcl/yarr")
+install.packages("yarr")
+# or the most recent version:
+# remotes::install_github("fdavidcl/yarr")
 library(yarr)
 download.file("https://www.openml.org/data/download/1681111/phpEUwA95", "dexter.arff")
 dexter <- read.arff("dexter.arff")
