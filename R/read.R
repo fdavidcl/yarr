@@ -49,7 +49,7 @@ read.arff <- function(file, stringsAsFactors = FALSE) {
 
 # data.frame -> logical -> data.frame
 fix_types <- function(contents, stringsAsFactors) {
-  types <- attr(contents, "attributes")
+  types <- tolower(attr(contents, "attributes"))
   contents[contents == "?"] <- NA
 
   for (i in 1:length(types)) {
